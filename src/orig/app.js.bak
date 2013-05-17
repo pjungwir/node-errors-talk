@@ -1,0 +1,45 @@
+var http = require("http");
+var fs = require('fs');
+// var sys = require('sys')
+var exec = require('child_process').exec;
+// var qs = require('querystring');
+var url = require('url');
+
+function encodeLaughTrack(infile, quality) {
+  var outfile = infile + "." + quality + ".out";
+  var cmd = "../laugh.rb -q " + quality + " " + infile;
+  fs.exists(outfile, function(found) {
+    if (found) {
+      // done!
+    } else {
+      console.log(cmd);
+      exec(cmd, function (error, stdout, stderr) {
+        console.log(error);
+        if (error) throw error;
+        if (stdout) console.log(stdout);
+      });
+    }
+  });
+}
+
+function encodeLaughTracks(infile) {
+  for (var i = 1; i <= 3; i++) {
+    encodeLaughTrack(infile, i);
+  }
+}
+
+var server = require('http').createServer(function(request, response) {
+  var queryData = url.parse(request.url, true).query;
+  var infile = queryData['file'];
+  if (infile.match(/^[a-zA-Z0-9._\-]+$/)) {
+    encodeLaughTracks(infile);
+    response.writeHead(200, {"Content-Type": "text/plain"});
+    response.write("okay\n");
+    response.end();
+  } else {
+    response.writeHead(500, {"Content-Type": "text/plain"});
+    response.write("bad input\n");
+    response.end();
+  }
+}).listen(8086);
+

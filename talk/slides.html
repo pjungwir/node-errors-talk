@@ -1,0 +1,280 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta content="text/html;charset=UTF-8" http-equiv="content-type">
+<title>deck.rb presentation</title>
+<meta charset="utf-8">
+<meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
+<meta content="width=1024, user-scalable=no" name="viewport">
+<link href="deck.js/core/deck.core.css" rel="stylesheet">
+<link href="deck.js/extensions/goto/deck.goto.css" rel="stylesheet">
+<link href="deck.js/extensions/menu/deck.menu.css" rel="stylesheet">
+<link href="deck.js/extensions/navigation/deck.navigation.css" rel="stylesheet">
+<link href="deck.js/extensions/status/deck.status.css" rel="stylesheet">
+<link href="deck.js/extensions/hash/deck.hash.css" rel="stylesheet">
+<link href="deck.js/extensions/scale/deck.scale.css" rel="stylesheet">
+<link href="deck.js/themes/style/swiss.css" id="style-theme-link" rel="stylesheet">
+<link href="deck.js/themes/transition/horizontal-slide.css" id="transition-theme-link" rel="stylesheet">
+<link href="coderay.css" rel="stylesheet">
+<link href="tables.css" rel="stylesheet">
+<link href="toc.css" rel="stylesheet">
+</head>
+<body class="deck-container">
+    <section class="slide" id="error_handling_in_nodejs"><h2>Error Handling in Node.js</h2>
+
+<p>Paul A. Jungwirth</p>
+
+<p>NodePDX</p>
+
+<p>May 2013</p>
+
+</section><section class="slide" id="no_error_handling"><h2>No error handling</h2>
+
+<pre class="CodeRay"><span class="keyword">function</span> <span class="function">notifyCaller</span>(infile, success) {
+  console.log(<span class="string"><span class="delimiter">"</span><span class="content">finished adding laughs to </span><span class="delimiter">"</span></span> + infile);
+  <span class="comment">// HTTP POST to indicate success or failure</span>
+}
+
+<span class="keyword">function</span> <span class="function">encodeLaughTracks</span>(infile) {
+  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="integer">1</span>; i &lt;= <span class="integer">3</span>; i++) {
+    <span class="keyword">var</span> cmd = <span class="string"><span class="delimiter">"</span><span class="content">../laugh.rb -q </span><span class="delimiter">"</span></span> + i + <span class="string"><span class="delimiter">"</span><span class="content"> </span><span class="delimiter">"</span></span> + infile;
+    console.log(cmd);
+    exec(cmd, <span class="keyword">function</span> (error, stdout, stderr) {
+      <span class="keyword">if</span> (error) <span class="keyword">throw</span> error;
+      notifyCaller(infile, <span class="predefined-constant">true</span>);
+    });
+  }
+}   
+</pre>
+
+<ul>
+<li>Lost requests</li>
+<li>No stack context</li>
+</ul></section><section class="slide" id="callbacks_vs_stack"><h2>Callbacks vs. Stack</h2>
+
+<pre class="CodeRay">/home/paul/src/node-errors-talk/src/orig/app.js:10
+    if (error) throw error;
+                     ^
+Error: Command failed: 
+    at ChildProcess.exithandler (child_process.js:634:15)
+    at ChildProcess.EventEmitter.emit (events.js:98:17)
+    at maybeClose (child_process.js:732:16)
+    at Process.ChildProcess._handle.onexit (child_process.js:799:5)
+</pre>
+
+</section><section class="slide" id="foreverjs"><h2>forever.js?</h2>
+
+<ul>
+<li>Automatically restarts node whenever it dies.</li>
+<li>That exception will still kill our server, so now the jobs will never finish.</li>
+<li>Restart the server to keep handling requests, but all current requests just died.</li>
+</ul></section><section class="slide" id="listen_for_uncaughtexception"><h2>listen for uncaughtException?</h2>
+
+<pre class="CodeRay">process.on(<span class="string"><span class="delimiter">'</span><span class="content">uncaughtException</span><span class="delimiter">'</span></span>, <span class="keyword">function</span>(err) {
+  console.log(err);
+});
+</pre>
+
+<ul>
+<li>Which request threw it?</li>
+<li>What is our state?</li>
+<li>Deprecated.</li>
+</ul></section><section class="slide" id="try_catch"><h2>try catch?</h2>
+
+<pre class="CodeRay"><span class="keyword">try</span> {
+  exec(cmd, <span class="keyword">function</span> (error, stdout, stderr) {
+    <span class="keyword">if</span> (error) <span class="keyword">throw</span> error;
+    notifyCaller(infile, <span class="predefined-constant">true</span>);
+  });
+} <span class="keyword">catch</span> (e) {
+  console.log(e);
+  notifyCaller(infile, <span class="predefined-constant">false</span>);
+}
+</pre>
+
+<ul>
+<li>But nothing outside the callback ever sees the exception.</li>
+<li>Callbacks start a new stack, so there is nothing to unwind!</li>
+</ul></section><section class="slide" id="domains"><h2>Domains</h2>
+
+<ul>
+<li>Since Node 0.8</li>
+<li>Unstable</li>
+<li>Error callbacks are scoped (sort of), not global.</li>
+</ul></section><section class="slide" id="domains"><h2>Domains</h2>
+
+<pre class="CodeRay"><span class="keyword">var</span> domain = require(<span class="string"><span class="delimiter">'</span><span class="content">domain</span><span class="delimiter">'</span></span>);
+
+http.createServer(<span class="keyword">function</span>(request, response) {
+  <span class="keyword">var</span> d = domain.create();
+
+  d.on(<span class="string"><span class="delimiter">'</span><span class="content">error</span><span class="delimiter">'</span></span>, <span class="keyword">function</span>(err) {
+    console.log(err);
+    <span class="comment">// Easy to log the request info here also.</span>
+  });
+
+  d.run(<span class="keyword">function</span>() {
+    <span class="comment">/* ... */</span>
+  });
+}).listen(<span class="integer">8086</span>);
+</pre>
+
+<ul>
+<li>Still can leak memory</li>
+<li>Need to kill the ps on error</li>
+<li>Still no stacktrace</li>
+</ul></section><section class="slide" id="cluster__domains"><h2>Cluster + Domains</h2>
+
+<ul>
+<li>Separate ps for each Cluster.</li>
+<li>Kill just the ps that error'ed.</li>
+<li>Give other requests time to finish first.</li>
+<li>One ps per core?</li>
+<li>Experimental</li>
+</ul></section><section class="slide" id="just_cluster"><h2>Just Cluster</h2>
+
+<pre class="CodeRay"><span class="keyword">var</span> cluster = require(<span class="string"><span class="delimiter">'</span><span class="content">cluster</span><span class="delimiter">'</span></span>);
+<span class="keyword">var</span> cpus = require(<span class="string"><span class="delimiter">'</span><span class="content">os</span><span class="delimiter">'</span></span>).cpus().length;
+
+<span class="keyword">if</span> (cluster.isMaster) {
+  <span class="comment">// fork workers</span>
+  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="integer">0</span>; i &lt; cpus; i++) {
+    cluster.fork();
+  }
+
+  cluster.on(<span class="string"><span class="delimiter">'</span><span class="content">exit</span><span class="delimiter">'</span></span>, <span class="keyword">function</span>(worker, code, signal) {
+    console.log(<span class="string"><span class="delimiter">'</span><span class="content">worker </span><span class="delimiter">'</span></span> + worker.process.pid + <span class="string"><span class="delimiter">'</span><span class="content"> died</span><span class="delimiter">'</span></span>);
+  });
+
+} <span class="keyword">else</span> {
+  http.createServer(<span class="keyword">function</span>(request, response) {
+    <span class="comment">/* ... */</span>
+  }).listen(<span class="integer">8086</span>);
+}
+</pre>
+
+</section><section class="slide" id="cluster__domains"><h2>Cluster + Domains</h2>
+
+<pre class="CodeRay"><span class="keyword">if</span> (cluster.isMaster) {
+  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="integer">0</span>; i &lt; cpus; i++) {
+    cluster.fork();
+  }
+
+  cluster.on(<span class="string"><span class="delimiter">'</span><span class="content">disconnect</span><span class="delimiter">'</span></span>, <span class="keyword">function</span>(worker) {
+    console.log(<span class="string"><span class="delimiter">'</span><span class="content">worker </span><span class="delimiter">'</span></span> + worker.process.pid + <span class="string"><span class="delimiter">'</span><span class="content"> died</span><span class="delimiter">'</span></span>);
+    cluster.fork();
+  }); 
+
+} <span class="keyword">else</span> {
+  http.createServer(<span class="keyword">function</span>(request, response) {
+    <span class="keyword">var</span> d = domain.create();
+    d.on(<span class="string"><span class="delimiter">'</span><span class="content">error</span><span class="delimiter">'</span></span>, <span class="keyword">function</span>(err) {
+      console.log(err.stack);
+
+      <span class="keyword">try</span> {
+        <span class="comment">// Ten minutes to let other connections finish:</span>
+        <span class="keyword">var</span> killTimer = setTimeout(<span class="keyword">function</span>() {
+          process.exit(<span class="integer">1</span>);
+        }, <span class="integer">10</span> * <span class="integer">60000</span>);
+        killTimer.unref(); <span class="comment">// Don't stay up just for the timer</span>
+        cluster.worker.disconnect(); <span class="comment">// Stop taking new requests</span>
+      } <span class="keyword">catch</span> (err2) {
+        console.log(<span class="string"><span class="delimiter">"</span><span class="content">Error handling error!: </span><span class="delimiter">"</span></span> + err2);
+      } 
+    });
+
+    d.add(request);  <span class="comment">// Explicit binding</span>
+    d.add(response); <span class="comment">// Explicit binding</span>
+
+    d.run(<span class="keyword">function</span>() {
+      <span class="comment">/* ... */</span>
+    });
+  }).listen(<span class="integer">8086</span>);
+} 
+</pre>
+
+</section><section class="slide" id="full_stack_traces_with_longjohn"><h2>Full Stack Traces with longjohn</h2>
+
+<pre class="CodeRay"><span class="comment">// package.json:</span>
+{  
+  <span class="key"><span class="delimiter">"</span><span class="content">name</span><span class="delimiter">"</span></span>: <span class="string"><span class="delimiter">"</span><span class="content">NodeExceptionsDemo</span><span class="delimiter">"</span></span>,
+  <span class="key"><span class="delimiter">"</span><span class="content">dependencies</span><span class="delimiter">"</span></span>: { 
+    <span class="key"><span class="delimiter">"</span><span class="content">longjohn</span><span class="delimiter">"</span></span>: <span class="string"><span class="delimiter">"</span><span class="delimiter">"</span></span>
+  } 
+}   
+
+<span class="comment">// app.js:</span>
+require(<span class="string"><span class="delimiter">'</span><span class="content">longjohn</span><span class="delimiter">'</span></span>)
+</pre>
+
+</section><section class="slide" id="longjohn_stack_trace"><h2>longjohn Stack Trace:</h2>
+
+<pre class="CodeRay">Error: Command failed: 
+    at exithandler (child_process.js:634:15)
+    at EventEmitter.emit (events.js:98:17)
+    at maybeClose (child_process.js:732:16)
+    at Socket.&lt;anonymous&gt; (child_process.js:945:11)
+    at EventEmitter.emit (events.js:95:17)
+    at Pipe.close (net.js:451:12)
+---------------------------------------------
+    at exports.execFile (child_process.js:688:9)
+    at exports.exec (child_process.js:575:18)
+    at encodeLaughTracks (/home/paul/src/node-errors-talk/src/longjohn/app.js:14:5)
+    at /home/paul/src/node-errors-talk/src/longjohn/app.js:56:9
+    at b (domain.js:183:18)
+    at Domain.run (domain.js:123:23)
+    at Server.&lt;anonymous&gt; (/home/paul/src/node-errors-talk/src/longjohn/app.js:52:7)
+</pre>
+
+</section><section class="slide" id="but_im_using_express"><h1>But I'm using Express!</h1>
+</section><section class="slide" id="references_and_further_reading"><h2>References and Further Reading</h2>
+
+<ul>
+<li><a href="http://nodejs.org/api/domain.html">http://nodejs.org/api/domain.html</a></li>
+<li><a href="http://nodejs.org/api/cluster.html">http://nodejs.org/api/cluster.html</a></li>
+<li><a href="http://shapeshed.com/uncaught-exceptions-in-node/">http://shapeshed.com/uncaught-exceptions-in-node/</a></li>
+<li><a href="http://stackoverflow.com/questions/7310521/node-js-best-practice-exception-handling">http://stackoverflow.com/questions/7310521/node-js-best-practice-exception-handling</a></li>
+<li><a href="https://groups.google.com/forum/?fromgroups#!msg/nodejs/5R6kPncBGwE/woBz84kwMcAJ">https://groups.google.com/forum/?fromgroups#!msg/nodejs/5R6kPncBGwE/woBz84kwMcAJ</a></li>
+<li><a href="https://github.com/mattinsler/longjohn">https://github.com/mattinsler/longjohn</a></li>
+</ul></section><a class="deck-prev-link" href="#" title="Previous"></a><a class="deck-next-link" href="#" title="Next"></a>    <div class="slide_toc">      <div class="toggle">[contents]</div>
+      <div class="table">
+        <h2>deck.rb presentation</h2>
+        <ul>
+<li><a href="#error_handling_in_nodejs">Error Handling in Node.js</a></li>
+          <li><a href="#no_error_handling">No error handling</a></li>
+          <li><a href="#callbacks_vs_stack">Callbacks vs. Stack</a></li>
+          <li><a href="#foreverjs">forever.js?</a></li>
+          <li><a href="#listen_for_uncaughtexception">listen for uncaughtException?</a></li>
+          <li><a href="#try_catch">try catch?</a></li>
+          <li><a href="#domains">Domains</a></li>
+          <li><a href="#domains">Domains</a></li>
+          <li><a href="#cluster__domains">Cluster + Domains</a></li>
+          <li><a href="#just_cluster">Just Cluster</a></li>
+          <li><a href="#cluster__domains">Cluster + Domains</a></li>
+          <li><a href="#full_stack_traces_with_longjohn">Full Stack Traces with longjohn</a></li>
+          <li><a href="#longjohn_stack_trace">longjohn Stack Trace:</a></li>
+          <li><a href="#but_im_using_express">But I'm using Express!</a></li>
+          <li><a href="#references_and_further_reading">References and Further Reading</a></li>
+        </ul>
+</div>
+    </div>
+    <p class="deck-status"><span class="deck-status-current"></span>/<span class="deck-status-total"></span></p>
+    <form action="." class="goto-form" method="get">
+      <label for="goto-slide">Go to slide:</label>
+      <input id="goto-slide" list="goto-datalist" name="slidenum" type="text"><datalist id="goto-datalist"></datalist><input type="submit" value="Go">
+</form>
+    <a class="deck-permalink" href="." title="Permalink to this slide">#</a>
+    <script src="deck.js/modernizr.custom.js"></script><script src="deck.js/jquery-1.7.2.min.js"></script><script type="text/javascript">
+// <![CDATA[
+
+jQuery(document).ready(function($){
+    $('.slide_toc .toggle').click(function(){
+      $('.slide_toc .table').toggle();
+    });
+
+});
+// ]]>
+    </script><!--Deck Core and extensions--><script src="deck.js/core/deck.core.js" type="text/javascript"></script><script src="deck.js/extensions/goto/deck.goto.js" type="text/javascript"></script><script src="deck.js/extensions/menu/deck.menu.js" type="text/javascript"></script><script src="deck.js/extensions/navigation/deck.navigation.js" type="text/javascript"></script><script src="deck.js/extensions/status/deck.status.js" type="text/javascript"></script><script src="deck.js/extensions/hash/deck.hash.js" type="text/javascript"></script><script src="deck.js/extensions/scale/deck.scale.js" type="text/javascript"></script><script>$(function(){$.deck('.slide');});</script>
+</body>
+</html>
+

@@ -1,0 +1,6 @@
+{ 
+  "name": "NodeExceptionsDemo", 
+  "dependencies": { 
+    "longjohn": ""
+  } 
+}
