@@ -1,5 +1,7 @@
 .*.swp
 .*.swo
+.~lock.*#
 .rvmrc
 /talk/deck.js
 node_modules
+
