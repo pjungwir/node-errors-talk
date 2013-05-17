@@ -225,10 +225,6 @@ May 2013
         at Server.<anonymous> (/home/paul/src/node-errors-talk/src/longjohn/app.js:52:7)
 
 
-# But I'm using Express!
-
-
-
 # References and Further Reading
 
 * http://nodejs.org/api/domain.html
@@ -237,6 +233,7 @@ May 2013
 * http://stackoverflow.com/questions/7310521/node-js-best-practice-exception-handling
 * https://groups.google.com/forum/?fromgroups#!msg/nodejs/5R6kPncBGwE/woBz84kwMcAJ
 * https://github.com/mattinsler/longjohn
+* https://github.com/pjungwir/node-errors-talk
 
 
 
