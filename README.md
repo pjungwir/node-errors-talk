@@ -4,6 +4,7 @@
     by Paul Jungwirth
     May 2013
 
+* Video is at [NodePDX](http://video.nodepdx.org/video/26/handling-errors-with-clusters-and-domains).
 * Slides may be found at [illuminatedcomputing.com](http://illuminatedcomputing.com/talks/node-errors-talk/).
 * Slide source code (Markdown) in `talk`.
 * Example code in `src`.
